@@ -3,6 +3,7 @@ var router 	= express.Router();
 var jwt 	= require('jsonwebtoken');  
 var config 	= require('../../config/constants'); 
 var passport= require('passport');
+var ObjectId = require('mongodb').ObjectID;
 
 //initialize models
 var User  	= require('../models/user');
@@ -76,25 +77,37 @@ router.get('/list-reviews', function(req, res) {
 	});
 });
 
+const multer = require("multer");
+
+const handleError = (err, res) => {
+  res
+    .status(500)
+    .contentType("text/plain")
+    .end("Oops! Something went wrong!");
+};
+
+const upload = multer({dest: "../../public"});
+
 /* POST create review method. */
-router.post('/create-review', passport.authenticate('jwt', { session: false}), function(req, res) {
+router.post('/create-review', passport.authenticate('jwt',{session: false}), function(req, res) {
+	//console.log('888888: ',req.body);
 	var token = getToken(req.headers);
 	if (token) {
 		var decoded = jwt.decode(token, config.secret);
 		User.findOne({
 		  email: decoded.email
 		}, function(err, user) {
-		    if (err) throw err;
-
+		    if (err){
+	    		return res.status(403).send({success: false, msg: err});
+		    }
 		    if (!user) {
-		      return res.status(403).send({success: false, msg: 'Authentication failed. User not found.'});
+		      return res.status(403).send({success: false, msg: 'Authentication failed.'});
 		    } else {
-
+		    	
 		    	var newReviews 				= new Reviews();
-			    // set the reviews's parameters
 			    newReviews.description 		= req.body.description;
-				newReviews.author 			= req.body.author;
-				newReviews.image 			= req.body.image;
+			    newReviews.restaurantId 	= req.body.restaurantId;
+				newReviews.author 			= user.email;
 				newReviews.latitude 		= req.body.latitude;
 				newReviews.longitude 		= req.body.longitude;
 
@@ -109,6 +122,76 @@ router.post('/create-review', passport.authenticate('jwt', { session: false}), f
 		});
 	} else { 
 		return res.status(403).send({success: false, msg: 'No token provided.'});
+	}
+});
+
+/* POST update review method. */
+router.post('/:id/update-review', passport.authenticate('jwt',{session: false}), function(req, res) {
+	var token = getToken(req.headers);
+	if (token && req.params.id) {
+		var decoded = jwt.decode(token, config.secret);
+		User.findOne({
+		  email: decoded.email
+		}, function(err, user) {
+		    if (err){
+	    		return res.status(403).send({success: false, msg: err});
+		    }
+		    if (!user) {
+		      return res.status(403).send({success: false, msg: 'Authentication failed.'});
+		    } else {
+		    	var reviewId = req.params.id;
+		    	Reviews.findOneAndUpdate(
+		    		{'_id': new ObjectId(reviewId), author: user.email },
+		    		{$set: {
+			    				description: 	req.body.description,
+								restaurantId: 	req.body.restaurantId,
+								latitude: 		req.body.latitude,
+								longitude: 		req.body.longitude
+		    				}
+		    		},
+		    		function(err, obj){
+		    		if(err){
+		    			return res.status(403).send({success: false, msg: err});			
+		    		}else{
+		    			res.json({ success: true, message: 'Successfully updated review.' });
+		    		}
+		    	});
+		    }
+		});
+	} else { 
+		return res.status(403).send({success: false, msg: 'No token provided or review id sent'});
+	}
+});
+
+/* POST delete review method. */
+router.post('/:id/delete-review', passport.authenticate('jwt',{session: false}), function(req, res) {
+	var token = getToken(req.headers);
+	if (token && req.params.id) {
+		var decoded = jwt.decode(token, config.secret);
+		User.findOne({
+		  email: decoded.email
+		}, function(err, user) {
+		    if (err){
+	    		return res.status(403).send({success: false, msg: err});
+		    }
+		    if (!user) {
+		      return res.status(403).send({success: false, msg: 'Authentication failed.'});
+		    } else {
+		    	var reviewId = req.params.id;
+		    	Reviews.findOne({'_id': new ObjectId(reviewId), author: user.email },function(err, review){
+		    		if(err){
+	    				return res.status(403).send({success: false, msg: err});
+		    		}
+		    		if(!review){
+		    			return res.status(403).send({success: false, msg: 'Review not found.'});
+		    		}else{
+		    			review.remove();
+		    		}
+		    	});
+		    }
+		});
+	} else { 
+		return res.status(403).send({success: false, msg: 'No token provided or review id sent'});
 	}
 });
 

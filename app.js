@@ -10,8 +10,6 @@ var bodyParser = require('body-parser');
 var configDB = require('./config/database.js');
 mongoose.connect(configDB.database, { useNewUrlParser: true }); // connect to our database
 
-
-
 // routes =============================
 var indexRouter = require('./app/routes/index');
 var usersRouter = require('./app/routes/api');
@@ -24,7 +22,7 @@ require('./config/passport')(passport);
 app.use(passport.initialize()); 
 
 // Use body-parser to get POST requests for API use
-app.use(bodyParser.urlencoded({ extended: false }));  
+app.use(bodyParser.urlencoded({ extended: true }));  
 app.use(bodyParser.json());
 
 app.use(logger('dev'));
