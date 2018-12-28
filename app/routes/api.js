@@ -1,7 +1,7 @@
 var express = require('express');
 var router 	= express.Router();
-var jwt 	= require('jsonwebtoken');  
-var config 	= require('../../config/constants'); 
+var jwt 	= require('jsonwebtoken');
+var config 	= require('../../config/constants');
 var passport= require('passport');
 var ObjectId = require('mongodb').ObjectID;
 
@@ -24,8 +24,6 @@ router.post('/login', function(req, res) {
 	    }
 	    if (!user) {
 	      res.send({ success: false, message: 'Authentication failed. User not found.' });
-	      //res.send({ success: false, message: user });
-
 	    } else {
 	      // Check if password matches
 	      user.comparePassword(req.body.password, function(err, isMatch) {
@@ -44,7 +42,7 @@ router.post('/login', function(req, res) {
 });
 
 /* POST register method. */
-router.post('/register', function(req, res) {  
+router.post('/register', function(req, res) {
   if(!req.body.email || !req.body.password) {
     res.json({ success: false, message: 'Please enter email and password.' });
   } else {
@@ -64,7 +62,7 @@ router.post('/register', function(req, res) {
 });
 
 /* POST reviews method. */
-router.get('/list-reviews', function(req, res) {  
+router.get('/list-reviews', function(req, res) {
     Reviews.find({}, function(err, reviews) {
 	    if (err){
 	    	res.send({ success: false, message: err });
@@ -90,7 +88,6 @@ const upload = multer({dest: "../../public"});
 
 /* POST create review method. */
 router.post('/create-review', passport.authenticate('jwt',{session: false}), function(req, res) {
-	//console.log('888888: ',req.body);
 	var token = getToken(req.headers);
 	if (token) {
 		var decoded = jwt.decode(token, config.secret);
@@ -103,13 +100,15 @@ router.post('/create-review', passport.authenticate('jwt',{session: false}), fun
 		    if (!user) {
 		      return res.status(403).send({success: false, msg: 'Authentication failed.'});
 		    } else {
-		    	
-		    	var newReviews 				= new Reviews();
-			    newReviews.description 		= req.body.description;
-			    newReviews.restaurantId 	= req.body.restaurantId;
-				newReviews.author 			= user.email;
-				newReviews.latitude 		= req.body.latitude;
-				newReviews.longitude 		= req.body.longitude;
+
+		    	var newReviews 				     = new Reviews();
+			    newReviews.description 		 = req.body.description;
+			    newReviews.restaurantId 	 = req.body.restaurantId;
+  				newReviews.author 			   = user.email;
+          newReviews.location.type   = 'Point';
+          newReviews.location.coordinates = [req.body.longitude, req.body.latitude];
+  				//newReviews.latitude 		   = req.body.latitude;
+  				//newReviews.longitude 		   = req.body.longitude;
 
 			    // Attempt to save the reviews
 			    newReviews.save(function(err) {
@@ -120,7 +119,7 @@ router.post('/create-review', passport.authenticate('jwt',{session: false}), fun
 			    });
 		    }
 		});
-	} else { 
+	} else {
 		return res.status(403).send({success: false, msg: 'No token provided.'});
 	}
 });
@@ -143,22 +142,21 @@ router.post('/:id/update-review', passport.authenticate('jwt',{session: false}),
 		    	Reviews.findOneAndUpdate(
 		    		{'_id': new ObjectId(reviewId), author: user.email },
 		    		{$set: {
-			    				description: 	req.body.description,
-								restaurantId: 	req.body.restaurantId,
-								latitude: 		req.body.latitude,
-								longitude: 		req.body.longitude
+			    			description: 	req.body.description,
+								restaurantId: req.body.restaurantId,
+                'location.coordinates' : [req.body.longitude, req.body.latitude]
 		    				}
 		    		},
 		    		function(err, obj){
 		    		if(err){
-		    			return res.status(403).send({success: false, msg: err});			
+		    			return res.status(403).send({success: false, msg: err});
 		    		}else{
 		    			res.json({ success: true, message: 'Successfully updated review.' });
 		    		}
 		    	});
 		    }
 		});
-	} else { 
+	} else {
 		return res.status(403).send({success: false, msg: 'No token provided or review id sent'});
 	}
 });
@@ -190,8 +188,38 @@ router.post('/:id/delete-review', passport.authenticate('jwt',{session: false}),
 		    	});
 		    }
 		});
-	} else { 
+	} else {
 		return res.status(403).send({success: false, msg: 'No token provided or review id sent'});
+	}
+});
+
+/* POST find nearby review method. */
+router.post('/get-nearby-restaurant', function(req, res) {
+  let long = req.body.longitude;
+  let latt = req.body.latitude;
+  let milesWithin = config.milesWithin;
+
+  if( long && latt ) {
+    Reviews.find({
+      location: {
+         $nearSphere: {
+           $geometry: {
+             type: "Point",
+             coordinates:
+               [long, latt]
+           },
+            $maxDistance: milesWithin * 1609.34
+         }
+       }
+    }, function(error, reviews){
+      if (error){
+        return res.status(403).send({success: false, msg: error});
+      }else{
+        return res.status(403).send({success: true, msg: results});
+      }
+    });
+	} else {
+		return res.status(403).send({success: false, msg: 'No latitude/longitude provided in request'});
 	}
 });
 
@@ -208,4 +236,5 @@ getToken = function (headers) {
   }
 };
 
+/***********************************/
 module.exports = router;

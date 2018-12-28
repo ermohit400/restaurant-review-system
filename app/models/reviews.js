@@ -4,29 +4,25 @@ var mongoose = require('mongoose');
 var reviewsSchema = mongoose.Schema({
     description   : {
 		type : String,
-		required : true 
+		required : true
 	},
     author : {
 		type : String,
-		required : true 
+		required : true
 	},
 	restaurantId : {
 		type : Number,
-		required : true 
+		required : true
 	},
 	createdAt: {type: Date, default: Date.now},
   	updatedAt: {type: Date, default: Date.now},
     image : {
 		type : String,
 	},
-    latitude  : {
-		type : String,
-		required : true 
-	},
-    longitude : {
-		type : String,
-		required : true 
-	}
+  location: {
+   type: { type: String },
+   coordinates: []
+  },
 });
 
 // create the model for Reviews and expose it to our app
